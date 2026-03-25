@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ToDoリスト</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#4a6cf7">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ToDo">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;700&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #f0f4ff;
+    --surface: #ffffff;
+    --surface2: #f5f7ff;
+    --border: #dde3f5;
+    --accent: #4a6cf7;
+    --accent2: #f76a8a;
+    --accent3: #22c99a;
+    --text: #1e2340;
+    --text-muted: #8b93b8;
+    --high: #f74a4a;
+    --mid: #f7a44a;
+    --low: #22c99a;
+    --done-opacity: 0.45;
+    --radius: 14px;
+    --shadow: 0 2px 16px rgba(74,108,247,0.08);
+    --shadow-card: 0 2px 10px rgba(30,35,64,0.07);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Zen Kaku Gothic New', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 0 0 80px 0; }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #4a6cf7 0%, #6a8cff 60%, #a78bfa 100%);
+    padding: 20px 16px 14px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 16px rgba(74,108,247,0.25);
+  }
+  .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .app-title { font-size: 20px; font-weight: 700; letter-spacing: 0.04em; color: #fff; }
+  .top-stats { display: flex; gap: 10px; font-family: 'DM Mono', monospace; font-size: 12px; color: rgba(255,255,255,0.8); }
+  .top-stats span { color: #fff; font-weight: 700; }
+
+  /* Help button */
+  .help-btn {
+    background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
+    color: #fff; width: 26px; height: 26px; border-radius: 50%;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: background 0.15s;
+  }
+  .help-btn:active { background: rgba(255,255,255,0.35); }
+
+  /* Help modal */
+  .help-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(30,35,64,0.45); z-index: 600;
+    backdrop-filter: blur(3px);
+  }
+  .help-overlay.open { display: block; }
+  .help-modal {
+    display: none; position: fixed;
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: var(--surface); border-radius: 18px;
+    box-shadow: 0 20px 60px rgba(30,35,64,0.25);
+    z-index: 610; width: calc(100% - 32px); max-width: 360px;
+    max-height: 80vh; overflow-y: auto;
+    animation: helpIn 0.2s ease;
+  }
+  @keyframes helpIn { from { opacity:0; transform:translate(-50%,-46%); } to { opacity:1; transform:translate(-50%,-50%); } }
+  .help-modal.open { display: block; }
+  .help-header {
+    background: linear-gradient(135deg, #4a6cf7, #a78bfa);
+    padding: 16px 18px 14px; border-radius: 16px 16px 0 0;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0;
+  }
+  .help-title { font-size: 15px; font-weight: 700; color: #fff; }
+  .help-close { background: rgba(255,255,255,0.2); border: none; color: #fff; width: 26px; height: 26px; border-radius: 50%; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .help-body { padding: 16px 18px 20px; }
+  .help-section { margin-bottom: 16px; }
+  .help-section:last-child { margin-bottom: 0; }
+  .help-section-title { font-size: 12px; font-weight: 700; color: var(--accent); font-family: 'DM Mono', monospace; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+  .help-item { display: flex; gap: 10px; margin-bottom: 7px; align-items: flex-start; }
+  .help-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+  .help-text { font-size: 13px; line-height: 1.5; color: var(--text); }
+  .help-text b { color: var(--accent); }
+  .help-badge { display: inline-block; font-size: 10px; font-family: 'DM Mono', monospace; padding: 1px 7px; border-radius: 4px; margin: 0 2px; vertical-align: middle; }
+  .hb-high { background: #fff0f0; color: var(--high); }
+  .hb-mid  { background: #fff7ed; color: var(--mid); }
+  .hb-low  { background: #edfff8; color: var(--low); }
+
+  /* Deadline summary */
+  .deadline-summary { background: rgba(255,255,255,0.15); border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+  .summary-toggle { display: flex; align-items: center; justify-content: space-between; padding: 7px 12px; cursor: pointer; user-select: none; }
+  .summary-toggle-label { font-size: 11px; font-family: 'DM Mono', monospace; color: rgba(255,255,255,0.85); letter-spacing: 0.06em; }
+  .toggle-arrow { font-size: 10px; color: rgba(255,255,255,0.7); transition: transform 0.2s; }
+  .deadline-summary.open .toggle-arrow { transform: rotate(180deg); }
+  .summary-grid { display: none; grid-template-columns: repeat(4,1fr); gap: 1px; background: rgba(255,255,255,0.1); border-top: 1px solid rgba(255,255,255,0.1); }
+  .summary-grid-bottom { display: none; grid-template-columns: repeat(4,1fr); gap: 1px; background: rgba(255,255,255,0.1); }
+  .deadline-summary.open .summary-grid { display: grid; }
+  .deadline-summary.open .summary-grid-bottom { display: grid; }
+  .dl-cell { background: rgba(255,255,255,0.08); padding: 8px 6px 7px; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; transition: background 0.15s; }
+  .dl-cell:active, .dl-cell.active-filter { background: rgba(255,255,255,0.28); }
+  .dl-count { font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 700; color: #fff; line-height: 1; }
+  .dl-count.zero { opacity: 0.35; font-size: 15px; }
+  .dl-label { font-size: 10px; color: rgba(255,255,255,0.75); text-align: center; line-height: 1.3; white-space: nowrap; }
+  .dl-cell.zone-over  .dl-count { color: #ffb3b3; }
+  .dl-cell.zone-today .dl-count { color: #ffd966; }
+  .dl-cell.zone-2d    .dl-count { color: #ffb347; }
+  .dl-cell.zone-7d    .dl-count { color: #7bffcf; }
+  .dl-cell.zone-30d   .dl-count { color: #a0c4ff; }
+  .dl-cell.zone-90d   .dl-count { color: #c3b1e1; }
+  .dl-cell.zone-1y    .dl-count { color: #d4e1ff; }
+  .dl-cell.zone-none  .dl-count { color: rgba(255,255,255,0.5); }
+
+  /* Filter bar — reordered in HTML */
+  .filter-bar { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .filter-bar::-webkit-scrollbar { display: none; }
+  .filter-btn { flex-shrink: 0; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); color: rgba(255,255,255,0.85); padding: 5px 13px; border-radius: 20px; font-family: 'Zen Kaku Gothic New', sans-serif; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+  .filter-btn.active { background: #fff; border-color: #fff; color: var(--accent); font-weight: 700; }
+
+  /* Search */
+  .search-wrap { padding: 14px 16px 0; }
+  .search-input { width: 100%; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 10px 16px 10px 40px; color: var(--text); font-family: 'Zen Kaku Gothic New', sans-serif; font-size: 14px; outline: none; transition: border-color 0.2s; box-shadow: var(--shadow); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b93b8' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: 14px center; }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text-muted); }
+
+  /* Add form */
+  .add-wrap { padding: 12px 16px; }
+  .add-form { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow); transition: border-color 0.2s; }
+  .add-form.editing { border-color: var(--accent2); }
+  .form-header { display: flex; align-items: center; justify-content: space-between; }
+  .form-title { font-size: 11px; font-family: 'DM Mono', monospace; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; }
+  .add-form.editing .form-title { color: var(--accent2); }
+  .form-btns { display: flex; gap: 6px; align-items: center; }
+  .add-btn { background: var(--accent); border: none; color: white; height: 30px; padding: 0 14px; border-radius: 8px; font-family: 'Zen Kaku Gothic New', sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; transition: opacity 0.15s, transform 0.1s; white-space: nowrap; }
+  .add-btn:active { transform: scale(0.95); opacity: 0.85; }
+  .add-form.editing .add-btn { background: var(--accent2); }
+  .reset-btn { background: transparent; border: 1.5px solid var(--border); color: var(--text-muted); height: 30px; padding: 0 12px; border-radius: 8px; font-family: 'Zen Kaku Gothic New', sans-serif; font-size: 12px; cursor: pointer; white-space: nowrap; }
+  .task-input { width: 100%; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 12px; color: var(--text); font-family: 'Zen Kaku Gothic New', sans-serif; font-size: 15px; outline: none; transition: border-color 0.2s; }
+  .task-input:focus { border-color: var(--accent); }
+  .task-input::placeholder { color: var(--text-muted); }
+  .add-options { display: flex; gap: 8px; flex-wrap: wrap; }
+  .field-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 80px; }
+  .field-label { font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace; padding-left: 2px; }
+  .mini-select { width: 100%; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'Zen Kaku Gothic New', sans-serif; font-size: 13px; padding: 7px 10px; outline: none; cursor: pointer; }
+
+  /* ── Custom Calendar ── */
+  .cal-field { position: relative; }
+  .cal-trigger {
+    width: 100%; background: var(--surface2); border: 1.5px solid var(--border);
+    border-radius: 8px; color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 12px; padding: 7px 10px; cursor: pointer; text-align: left;
+    display: flex; align-items: center; justify-content: space-between;
+    transition: border-color 0.2s; user-select: none;
+  }
+  .cal-trigger:hover { border-color: var(--accent); }
+  .cal-trigger .cal-placeholder { color: var(--text-muted); }
+  .cal-trigger .cal-clear { color: var(--text-muted); font-size: 14px; padding: 0 2px; line-height: 1; }
+
+  /* オーバーレイ背景 */
+  .cal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(30,35,64,0.35); z-index: 490;
+    backdrop-filter: blur(2px);
+  }
+  .cal-overlay.open { display: block; }
+
+  .cal-popup {
+    display: none; position: fixed;
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 16px; box-shadow: 0 16px 48px rgba(30,35,64,0.22);
+    z-index: 500; width: 290px; padding: 16px;
+    animation: calIn 0.18s ease;
+  }
+  @keyframes calIn { from { opacity:0; transform:translate(-50%,-46%); } to { opacity:1; transform:translate(-50%,-50%); } }
+  .cal-popup.open { display: block; }
+
+  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .cal-nav { background: transparent; border: 1.5px solid var(--border); color: var(--text-muted); width: 28px; height: 28px; border-radius: 7px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .cal-nav:hover { background: var(--surface2); color: var(--accent); border-color: var(--accent); }
+  .cal-month-label { font-size: 13px; font-weight: 700; color: var(--text); font-family: 'DM Mono', monospace; }
+
+  .cal-days-header { display: grid; grid-template-columns: repeat(7,1fr); margin-bottom: 4px; }
+  .cal-dow { font-size: 10px; font-family: 'DM Mono', monospace; text-align: center; padding: 3px 0; font-weight: 700; }
+  .cal-dow.sun { color: #f74a4a; }
+  .cal-dow.sat { color: #4a6cf7; }
+
+  .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+  .cal-day {
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    border-radius: 7px; font-size: 12px; font-family: 'DM Mono', monospace;
+    cursor: pointer; transition: all 0.12s; color: var(--text);
+    border: 1.5px solid transparent;
+  }
+  .cal-day:hover { background: var(--surface2); border-color: var(--border); }
+  .cal-day.empty { cursor: default; }
+  .cal-day.empty:hover { background: transparent; border-color: transparent; }
+  .cal-day.sun { color: #f74a4a; }
+  .cal-day.sat { color: #4a6cf7; }
+  .cal-day.today-marker { background: var(--surface2); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+  .cal-day.selected { background: var(--accent); color: #fff !important; border-color: var(--accent); font-weight: 700; }
+  .cal-day.selected.sun, .cal-day.selected.sat { color: #fff !important; }
+  .cal-day.other-month { color: var(--text-muted); opacity: 0.4; }
+
+  .cal-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+  .cal-today-btn { font-size: 11px; color: var(--accent); background: transparent; border: none; cursor: pointer; font-family: 'Zen Kaku Gothic New', sans-serif; }
+  .cal-clear-btn { font-size: 11px; color: var(--text-muted); background: transparent; border: none; cursor: pointer; font-family: 'Zen Kaku Gothic New', sans-serif; }
+
+  /* Cat tabs */
+  .cat-tabs { display: flex; gap: 6px; padding: 8px 16px 0; overflow-x: auto; scrollbar-width: none; }
+  .cat-tabs::-webkit-scrollbar { display: none; }
+  .cat-tab { flex-shrink: 0; background: var(--surface); border: 1.5px solid var(--border); color: var(--text-muted); padding: 4px 13px; border-radius: 20px; font-family: 'Zen Kaku Gothic New', sans-serif; font-size: 12px; cursor: pointer; box-shadow: var(--shadow-card); transition: all 0.15s; }
+  .cat-tab.active { background: var(--accent2); border-color: var(--accent2); color: #fff; font-weight: 700; }
+
+  /* Sort */
+  .sort-bar { display: flex; gap: 6px; align-items: center; padding: 10px 16px 4px; }
+  .sort-label { font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+  .sort-btn { background: var(--surface); border: 1.5px solid var(--border); color: var(--text-muted); font-size: 11px; font-family: 'DM Mono', monospace; padding: 3px 10px; border-radius: 20px; cursor: pointer; box-shadow: var(--shadow-card); }
+  .sort-btn.active { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+
+  .section-label { padding: 6px 16px; font-size: 10px; font-family: 'DM Mono', monospace; color: var(--text-muted); letter-spacing: 0.12em; text-transform: uppercase; }
+
+  /* Task cards */
+  .task-list { padding: 0 16px; display: flex; flex-direction: column; gap: 8px; }
+  .task-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 13px 13px 13px 16px; display: flex; align-items: flex-start; gap: 11px; animation: slideIn 0.2s ease; position: relative; overflow: hidden; transition: border-color 0.2s, opacity 0.2s; box-shadow: var(--shadow-card); }
+  @keyframes slideIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+  .task-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; border-radius:4px 0 0 4px; }
+  .task-card.pri-high::before { background: var(--high); }
+  .task-card.pri-mid::before  { background: var(--mid); }
+  .task-card.pri-low::before  { background: var(--low); }
+  .task-card.done { opacity: var(--done-opacity); }
+  .task-card.editing-now { border-color: var(--accent2); box-shadow: 0 0 0 3px rgba(247,106,138,0.12); }
+  .check-btn { width:22px; height:22px; border-radius:50%; border:2px solid var(--border); background:transparent; flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; margin-top:1px; }
+  .task-card.done .check-btn { background: var(--accent3); border-color: var(--accent3); }
+  .check-icon { display:none; color:#fff; font-size:12px; font-weight:700; }
+  .task-card.done .check-icon { display:block; }
+  .task-body { flex:1; min-width:0; }
+  .task-name { font-size:15px; line-height:1.4; word-break:break-word; color:var(--text); }
+  .task-card.done .task-name { text-decoration:line-through; color:var(--text-muted); }
+  .task-meta { display:flex; gap:5px; margin-top:7px; flex-wrap:wrap; align-items:center; }
+  .meta-chip { font-size:11px; font-family:'DM Mono',monospace; padding:2px 8px; border-radius:5px; display:inline-flex; align-items:center; gap:3px; }
+  .chip-label { font-size:10px; opacity:0.65; }
+  .chip-pri.pri-high { background:#fff0f0; color:var(--high); }
+  .chip-pri.pri-mid  { background:#fff7ed; color:var(--mid); }
+  .chip-pri.pri-low  { background:#edfff8; color:var(--low); }
+  .chip-cat { background:#eef1ff; color:var(--accent); }
+  .chip-due { background:#f4f5fa; color:var(--text-muted); }
+  .chip-due.overdue { background:#fff0f0; color:var(--high); }
+  .chip-due.today   { background:#fff7ed; color:var(--mid); }
+  .card-actions { display:flex; flex-direction:column; gap:2px; flex-shrink:0; }
+  .icon-btn { background:transparent; border:none; cursor:pointer; font-size:15px; padding:3px 4px; border-radius:6px; color:var(--text-muted); line-height:1; transition:background 0.15s; }
+  .icon-btn:active { background: var(--surface2); }
+
+  /* Summary bar */
+  .summary-bar { position:fixed; bottom:0; left:0; right:0; background:var(--surface); border-top:1.5px solid var(--border); padding:10px 16px; display:flex; justify-content:space-between; align-items:center; font-size:12px; font-family:'DM Mono',monospace; color:var(--text-muted); z-index:100; box-shadow:0 -2px 12px rgba(74,108,247,0.07); }
+  .clear-done-btn { background:transparent; border:1.5px solid var(--border); color:var(--text-muted); padding:4px 13px; border-radius:20px; font-size:11px; font-family:'Zen Kaku Gothic New',sans-serif; cursor:pointer; }
+  .clear-done-btn:active { border-color:var(--high); color:var(--high); }
+  .empty-state { text-align:center; padding:48px 20px; color:var(--text-muted); font-size:14px; }
+  .empty-icon { font-size:40px; margin-bottom:12px; }
+
+  /* 完了確認ダイアログ */
+  .confirm-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(30,35,64,0.45); z-index: 700;
+    backdrop-filter: blur(3px);
+  }
+  .confirm-overlay.open { display: block; }
+
+  .confirm-dialog {
+    display: none; position: fixed;
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: var(--surface); border-radius: 18px;
+    box-shadow: 0 20px 60px rgba(30,35,64,0.25);
+    z-index: 710; width: calc(100% - 48px); max-width: 320px;
+    padding: 0; overflow: hidden;
+    animation: confirmIn 0.18s ease;
+  }
+  @keyframes confirmIn { from { opacity:0; transform:translate(-50%,-46%) scale(0.96); } to { opacity:1; transform:translate(-50%,-50%) scale(1); } }
+  .confirm-dialog.open { display: block; }
+
+  .confirm-top {
+    background: linear-gradient(135deg, #22c99a, #4a6cf7);
+    padding: 22px 20px 18px;
+    text-align: center;
+  }
+  .confirm-check-icon {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; margin: 0 auto 10px;
+  }
+  .confirm-title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .confirm-task-name {
+    font-size: 13px; color: rgba(255,255,255,0.85);
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; padding: 0 8px;
+  }
+
+  .confirm-body { padding: 16px 20px 20px; }
+  .confirm-message { font-size: 14px; color: var(--text); text-align: center; line-height: 1.6; margin-bottom: 16px; }
+
+  .confirm-btns { display: flex; gap: 10px; }
+  .confirm-cancel {
+    flex: 1; height: 44px; border-radius: 10px;
+    background: var(--surface2); border: 1.5px solid var(--border);
+    color: var(--text-muted); font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-size: 14px; cursor: pointer; transition: all 0.15s;
+  }
+  .confirm-cancel:active { background: var(--border); }
+  .confirm-yes {
+    flex: 1; height: 44px; border-radius: 10px;
+    background: var(--accent3); border: none;
+    color: #fff; font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.15s;
+  }
+  .confirm-yes:active { opacity: 0.85; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="app-title">ToDoリスト</div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="top-stats">
+        <div class="stat-item">残り <span id="undoneCount">0</span></div>
+        <div class="stat-item">完了 <span id="doneCount">0</span></div>
+      </div>
+      <button class="help-btn" id="helpBtn">?</button>
+    </div>
+  </div>
+
+  <div class="deadline-summary open" id="deadlineSummary">
+    <div class="summary-toggle" id="summaryToggle">
+      <span class="summary-toggle-label">📅 期限別タスク件数（未完了）</span>
+      <span class="toggle-arrow">▲</span>
+    </div>
+    <div class="summary-grid">
+      <div class="dl-cell zone-over"  data-zone="over"><div class="dl-count" id="cnt-over">0</div><div class="dl-label">期限切れ</div></div>
+      <div class="dl-cell zone-today" data-zone="today"><div class="dl-count" id="cnt-today">0</div><div class="dl-label">本日</div></div>
+      <div class="dl-cell zone-2d"   data-zone="2d"><div class="dl-count" id="cnt-2d">0</div><div class="dl-label">2日以内</div></div>
+      <div class="dl-cell zone-7d"   data-zone="7d"><div class="dl-count" id="cnt-7d">0</div><div class="dl-label">3〜7日</div></div>
+    </div>
+    <div class="summary-grid-bottom">
+      <div class="dl-cell zone-30d" data-zone="30d"><div class="dl-count" id="cnt-30d">0</div><div class="dl-label">8〜30日</div></div>
+      <div class="dl-cell zone-90d" data-zone="90d"><div class="dl-count" id="cnt-90d">0</div><div class="dl-label">31〜90日</div></div>
+      <div class="dl-cell zone-1y"  data-zone="1y"><div class="dl-count" id="cnt-1y">0</div><div class="dl-label">91日〜1年</div></div>
+      <div class="dl-cell zone-none" data-zone="none"><div class="dl-count" id="cnt-none">0</div><div class="dl-label">期限なし</div></div>
+    </div>
+  </div>
+
+  <!-- フィルターボタン: すべて → 今日が期限 → 未完了 → 完了済み → 期限切れ -->
+  <div class="filter-bar">
+    <button class="filter-btn active" data-filter="all">すべて</button>
+    <button class="filter-btn" data-filter="today">今日が期限</button>
+    <button class="filter-btn" data-filter="undone">未完了</button>
+    <button class="filter-btn" data-filter="done">完了済み</button>
+    <button class="filter-btn" data-filter="overdue">期限切れ</button>
+  </div>
+</div>
+
+<div class="search-wrap">
+  <input class="search-input" type="text" id="searchInput" placeholder="タスクを検索...">
+</div>
+
+<div class="add-wrap">
+  <div class="add-form" id="addForm">
+    <div class="form-header">
+      <div class="form-title" id="formTitle">新しいタスクを追加</div>
+      <div class="form-btns">
+        <button class="reset-btn" id="resetBtn">リセット</button>
+        <button class="add-btn"   id="addBtn">追加</button>
+      </div>
+    </div>
+    <input class="task-input" type="text" id="taskInput" placeholder="タスク内容を入力...">
+    <div class="add-options">
+      <div class="field-group">
+        <div class="field-label">優先度</div>
+        <select class="mini-select" id="prioritySelect">
+          <option value="mid">中</option>
+          <option value="high">高</option>
+          <option value="low">低</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <div class="field-label">カテゴリ</div>
+        <select class="mini-select" id="categorySelect">
+          <option value="仕事">仕事</option>
+          <option value="プライベート">プライベート</option>
+          <option value="買い物">買い物</option>
+          <option value="その他">その他</option>
+        </select>
+      </div>
+      <!-- カスタムカレンダー -->
+      <div class="field-group cal-field" id="calField">
+        <div class="field-label">期限日</div>
+        <div class="cal-trigger" id="calTrigger">
+          <span id="calTriggerText" class="cal-placeholder">日付を選択</span>
+          <span class="cal-clear" id="calClearBtn" style="display:none">×</span>
+        </div>
+        <div class="cal-overlay" id="calOverlay"></div>
+        <div class="cal-popup" id="calPopup">
+          <div class="cal-header">
+            <button class="cal-nav" id="calPrev">‹</button>
+            <div class="cal-month-label" id="calMonthLabel"></div>
+            <button class="cal-nav" id="calNext">›</button>
+          </div>
+          <div class="cal-days-header">
+            <div class="cal-dow sun">日</div>
+            <div class="cal-dow">月</div>
+            <div class="cal-dow">火</div>
+            <div class="cal-dow">水</div>
+            <div class="cal-dow">木</div>
+            <div class="cal-dow">金</div>
+            <div class="cal-dow sat">土</div>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+          <div class="cal-footer">
+            <button class="cal-today-btn" id="calTodayBtn">今日</button>
+            <button class="cal-clear-btn" id="calClearAllBtn">クリア</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cat-tabs" id="catTabs"></div>
+<div class="sort-bar">
+  <span class="sort-label">並び替え:</span>
+  <button class="sort-btn active" data-sort="added">追加順</button>
+  <button class="sort-btn" data-sort="priority">優先度</button>
+  <button class="sort-btn" data-sort="due">期限日</button>
+</div>
+<div class="section-label">タスク一覧</div>
+<div class="task-list" id="taskList"></div>
+
+<div class="summary-bar">
+  <span id="summaryText">0件</span>
+  <button class="clear-done-btn" id="clearDoneBtn">完了済みを削除</button>
+</div>
+
+<!-- 完了確認ダイアログ -->
+<div class="confirm-overlay" id="confirmOverlay"></div>
+<div class="confirm-dialog" id="confirmDialog">
+  <div class="confirm-top">
+    <div class="confirm-check-icon">✓</div>
+    <div class="confirm-title">タスクを完了しますか？</div>
+    <div class="confirm-task-name" id="confirmTaskName"></div>
+  </div>
+  <div class="confirm-body">
+    <div class="confirm-message">このタスクを完了済みにします。<br>よろしいですか？</div>
+    <div class="confirm-btns">
+      <button class="confirm-cancel" id="confirmCancel">キャンセル</button>
+      <button class="confirm-yes" id="confirmYes">完了にする</button>
+    </div>
+  </div>
+</div>
+
+<!-- Help overlay & modal -->
+<div class="help-overlay" id="helpOverlay"></div>
+<div class="help-modal" id="helpModal">
+  <div class="help-header">
+    <div class="help-title">📋 使い方ガイド</div>
+    <button class="help-close" id="helpClose">×</button>
+  </div>
+  <div class="help-body">
+
+    <div class="help-section">
+      <div class="help-section-title">タスクを追加する</div>
+      <div class="help-item"><div class="help-icon">✏️</div><div class="help-text">画面上部の入力欄にやること・タスクの内容を入力してください。</div></div>
+      <div class="help-item"><div class="help-icon">🎯</div><div class="help-text"><b>優先度</b>を「高／中／低」から選びます。タスクカードの左端の色で区別できます（<span class="help-badge hb-high">高</span><span class="help-badge hb-mid">中</span><span class="help-badge hb-low">低</span>）。</div></div>
+      <div class="help-item"><div class="help-icon">🗂</div><div class="help-text"><b>カテゴリ</b>を選びます（仕事／プライベート／買い物／その他）。後でカテゴリごとに絞り込んで表示できます。</div></div>
+      <div class="help-item"><div class="help-icon">📅</div><div class="help-text">「日付を選択」をタップすると<b>カレンダー</b>が画面中央に表示されます。日曜日は赤、土曜日は青で表示されています。日付を選ぶと自動で閉じます。</div></div>
+      <div class="help-item"><div class="help-icon">➕</div><div class="help-text">入力欄の右上にある<b>「追加」</b>ボタンを押すとタスクが一覧に追加されます。</div></div>
+      <div class="help-item"><div class="help-icon">🔄</div><div class="help-text"><b>「リセット」</b>ボタンを押すと、入力中の内容をすべて消して最初からやり直せます。</div></div>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-title">タスクを操作する</div>
+      <div class="help-item"><div class="help-icon">✅</div><div class="help-text">タスクの左側にある丸いボタンをタップすると確認画面が表示されます。<b>「完了にする」</b>を押すとタスクが完了になり、薄く表示されます。誤タップを防ぐための2段階確認です。</div></div>
+      <div class="help-item"><div class="help-icon">↩️</div><div class="help-text">完了済みのタスクの丸いボタンをもう一度タップすると、確認なしで<b>未完了に戻せます</b>。「やっぱりまだ終わってない」というときにすぐ操作できます。</div></div>
+      <div class="help-item"><div class="help-icon">✏️</div><div class="help-text">タスク右側の<b>✏️ボタン</b>をタップすると編集できます。内容が入力欄に読み込まれ、修正後に「更新」ボタンで保存します。</div></div>
+      <div class="help-item"><div class="help-icon">🗑</div><div class="help-text">タスク右側の<b>🗑ボタン</b>をタップするとそのタスクを削除します。削除したタスクは元に戻せませんのでご注意ください。</div></div>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-title">期限別の件数パネル</div>
+      <div class="help-item"><div class="help-icon">📊</div><div class="help-text">画面上部のパネルに、<b>未完了タスクが期限ごとに何件あるか</b>が一目でわかるよう表示されています。</div></div>
+      <div class="help-item"><div class="help-icon">👆</div><div class="help-text">パネルの各マスをタップすると、その期限のタスクだけを表示できます。もう一度タップすると解除されます。</div></div>
+      <div class="help-item"><div class="help-icon">▲</div><div class="help-text">「期限別タスク件数」の部分をタップするとパネルを折りたたんで非表示にできます。もう一度タップで元に戻ります。</div></div>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-title">表示を絞り込む・並び替える</div>
+      <div class="help-item"><div class="help-icon">🔘</div><div class="help-text">パネル下のボタンでタスクを<b>状態別に絞り込めます</b>（すべて／今日が期限／未完了／完了済み／期限切れ）。</div></div>
+      <div class="help-item"><div class="help-icon">🏷</div><div class="help-text">カテゴリのタブをタップすると、そのカテゴリのタスクだけを表示できます。</div></div>
+      <div class="help-item"><div class="help-icon">↕️</div><div class="help-text"><b>並び替え</b>は「追加順／優先度／期限日」から選べます。</div></div>
+      <div class="help-item"><div class="help-icon">🔍</div><div class="help-text">検索欄にキーワードを入力すると、タスク名で絞り込めます。</div></div>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-title">データの保存について</div>
+      <div class="help-item"><div class="help-icon">💾</div><div class="help-text">タスクは<b>このアプリを開いているブラウザ</b>（SafariやChromeなど）に自動で保存されます。一覧に表示されていれば保存されています。ブラウザやアプリを閉じても消えません。</div></div>
+      <div class="help-item"><div class="help-icon">⚠️</div><div class="help-text">ブラウザの「履歴・キャッシュの消去」や「サイトデータの削除」を行うと、タスクのデータも一緒に消えてしまいます。ご注意ください。</div></div>
+      <div class="help-item"><div class="help-icon">📱</div><div class="help-text">保存されるのは<b>同じブラウザ・同じ端末の中だけ</b>です。スマホとパソコンなど別々の端末では共有されません。</div></div>
+      <div class="help-item"><div class="help-icon">🧹</div><div class="help-text">画面下の<b>「完了済みを削除」</b>ボタンを押すと、完了済みのタスクをまとめて削除できます。</div></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ── Help modal ──
+  function openHelp() {
+    document.getElementById('helpModal').classList.add('open');
+    document.getElementById('helpOverlay').classList.add('open');
+  }
+  function closeHelp() {
+    document.getElementById('helpModal').classList.remove('open');
+    document.getElementById('helpOverlay').classList.remove('open');
+  }
+  document.getElementById('helpBtn').addEventListener('click', openHelp);
+  document.getElementById('helpClose').addEventListener('click', closeHelp);
+  document.getElementById('helpOverlay').addEventListener('click', closeHelp);
+
+  // ── Calendar ──
+  let calYear, calMonth, calSelected = null; // YYYY-MM-DD or null
+
+  function calToday() {
+    const d = new Date();
+    return { y: d.getFullYear(), m: d.getMonth(), d: d.getDate() };
+  }
+
+  function calInit() {
+    const t = calToday();
+    calYear = t.y; calMonth = t.m;
+    renderCal();
+  }
+
+  function calSetSelected(val) {
+    // val = 'YYYY-MM-DD' or null
+    calSelected = val;
+    const trigger = document.getElementById('calTriggerText');
+    const clearBtn = document.getElementById('calClearBtn');
+    if (val) {
+      const [y,m,d] = val.split('-').map(Number);
+      trigger.textContent = y + '/' + m + '/' + d;
+      trigger.classList.remove('cal-placeholder');
+      clearBtn.style.display = 'inline';
+    } else {
+      trigger.textContent = '日付を選択';
+      trigger.classList.add('cal-placeholder');
+      clearBtn.style.display = 'none';
+    }
+  }
+
+  function renderCal() {
+    const label = document.getElementById('calMonthLabel');
+    label.textContent = calYear + '年 ' + (calMonth+1) + '月';
+
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+
+    const t = calToday();
+    const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
+    const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+    const daysInPrev  = new Date(calYear, calMonth, 0).getDate();
+
+    // prev month padding
+    for (let i = 0; i < firstDay; i++) {
+      const d = document.createElement('div');
+      d.className = 'cal-day empty other-month';
+      const dayNum = daysInPrev - firstDay + 1 + i;
+      const dow = i; // 0=Sun
+      if (dow === 0) d.classList.add('sun');
+      if (dow === 6) d.classList.add('sat');
+      d.textContent = dayNum;
+      grid.appendChild(d);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const d = document.createElement('div');
+      d.className = 'cal-day';
+      const dow = (firstDay + day - 1) % 7;
+      if (dow === 0) d.classList.add('sun');
+      if (dow === 6) d.classList.add('sat');
+
+      const isToday = calYear === t.y && calMonth === t.m && day === t.d;
+      if (isToday) d.classList.add('today-marker');
+
+      const dateStr = calYear + '-' + String(calMonth+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+      if (calSelected === dateStr) d.classList.add('selected');
+
+      d.textContent = day;
+      d.addEventListener('click', () => {
+        calSetSelected(dateStr);
+        if (calMonth+1 !== parseInt(dateStr.split('-')[1])) {
+          calYear = parseInt(dateStr.split('-')[0]);
+          calMonth = parseInt(dateStr.split('-')[1]) - 1;
+        }
+        renderCal();
+        closeCal();
+      });
+      grid.appendChild(d);
+    }
+
+    // next month padding to fill last row
+    const total = firstDay + daysInMonth;
+    const remaining = total % 7 === 0 ? 0 : 7 - (total % 7);
+    for (let i = 1; i <= remaining; i++) {
+      const d = document.createElement('div');
+      d.className = 'cal-day empty other-month';
+      const dow = (total + i - 1) % 7;
+      if (dow === 0) d.classList.add('sun');
+      if (dow === 6) d.classList.add('sat');
+      d.textContent = i;
+      grid.appendChild(d);
+    }
+  }
+
+  function openCal() {
+    document.getElementById('calPopup').classList.add('open');
+    document.getElementById('calOverlay').classList.add('open');
+  }
+  function closeCal() {
+    document.getElementById('calPopup').classList.remove('open');
+    document.getElementById('calOverlay').classList.remove('open');
+  }
+
+  document.getElementById('calTrigger').addEventListener('click', (e) => {
+    if (e.target.id === 'calClearBtn') return;
+    const isOpen = document.getElementById('calPopup').classList.contains('open');
+    isOpen ? closeCal() : openCal();
+  });
+  document.getElementById('calClearBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    calSetSelected(null);
+    renderCal();
+  });
+  document.getElementById('calPrev').addEventListener('click', () => {
+    calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCal();
+  });
+  document.getElementById('calNext').addEventListener('click', () => {
+    calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCal();
+  });
+  document.getElementById('calTodayBtn').addEventListener('click', () => {
+    const t = calToday();
+    const dateStr = t.y + '-' + String(t.m+1).padStart(2,'0') + '-' + String(t.d).padStart(2,'0');
+    calYear = t.y; calMonth = t.m;
+    calSetSelected(dateStr);
+    renderCal(); closeCal();
+  });
+  document.getElementById('calClearAllBtn').addEventListener('click', () => {
+    calSetSelected(null); renderCal(); closeCal();
+  });
+  // オーバーレイクリックで閉じる
+  document.getElementById('calOverlay').addEventListener('click', closeCal);
+
+  calInit();
+
+  // ── ToDo logic ──
+  let tasks = JSON.parse(localStorage.getItem('hide_todo_v2') || '[]');
+  let filter = 'all', catFilter = 'all', sortMode = 'added', searchQuery = '';
+  let editingId = null, zoneFilter = null;
+
+  const PRI_ORDER = { high:0, mid:1, low:2 };
+  const PRI_LABEL = { high:'高', mid:'中', low:'低' };
+  const PRI_CLASS = { high:'pri-high', mid:'pri-mid', low:'pri-low' };
+
+  const save = () => localStorage.setItem('hide_todo_v2', JSON.stringify(tasks));
+  const esc  = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  function dayDiff(due) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const d = new Date(due); d.setHours(0,0,0,0);
+    return Math.round((d - today) / 86400000);
+  }
+  function getZone(task) {
+    if (!task.due) return 'none';
+    const d = dayDiff(task.due);
+    if (d < 0)    return 'over';
+    if (d === 0)  return 'today';
+    if (d <= 2)   return '2d';
+    if (d <= 7)   return '7d';
+    if (d <= 30)  return '30d';
+    if (d <= 90)  return '90d';
+    return '1y';
+  }
+  const isOverdue = due => due && dayDiff(due) < 0;
+  const isToday   = due => due && dayDiff(due) === 0;
+  const fmtDate   = due => { if (!due) return ''; const d = new Date(due); return (d.getMonth()+1)+'/'+d.getDate(); };
+
+  function updateDeadlineSummary() {
+    const undone = tasks.filter(t => !t.done);
+    const zones = { over:0, today:0, '2d':0, '7d':0, '30d':0, '90d':0, '1y':0, none:0 };
+    undone.forEach(t => { const z = getZone(t); if (zones[z]!==undefined) zones[z]++; });
+    Object.entries(zones).forEach(([z,n]) => {
+      const el = document.getElementById('cnt-'+z);
+      if (!el) return;
+      el.textContent = n;
+      el.className = 'dl-count' + (n===0?' zero':'');
+    });
+    document.querySelectorAll('.dl-cell').forEach(c => c.classList.toggle('active-filter', c.dataset.zone === zoneFilter));
+  }
+
+  document.getElementById('summaryToggle').addEventListener('click', () => {
+    document.getElementById('deadlineSummary').classList.toggle('open');
+  });
+
+  document.querySelectorAll('.dl-cell').forEach(cell => {
+    cell.addEventListener('click', () => {
+      const z = cell.dataset.zone;
+      zoneFilter = zoneFilter === z ? null : z;
+      if (zoneFilter) {
+        filter = 'all';
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector('[data-filter="all"]').classList.add('active');
+      }
+      updateDeadlineSummary(); renderTasks();
+    });
+  });
+
+  function getDueValue() { return calSelected || ''; }
+
+  function resetForm() {
+    editingId = null;
+    document.getElementById('taskInput').value = '';
+    document.getElementById('prioritySelect').value = 'mid';
+    document.getElementById('categorySelect').value = '仕事';
+    calSetSelected(null); renderCal();
+    document.getElementById('formTitle').textContent = '新しいタスクを追加';
+    document.getElementById('addBtn').textContent = '追加';
+    document.getElementById('addForm').classList.remove('editing');
+    renderTasks();
+  }
+
+  function startEdit(id) {
+    const t = tasks.find(t => t.id === id); if (!t) return;
+    editingId = id;
+    document.getElementById('taskInput').value = t.name;
+    document.getElementById('prioritySelect').value = t.priority;
+    document.getElementById('categorySelect').value = t.category;
+    if (t.due) {
+      calSetSelected(t.due);
+      const [y,m] = t.due.split('-').map(Number);
+      calYear = y; calMonth = m-1;
+    } else {
+      calSetSelected(null);
+    }
+    renderCal();
+    document.getElementById('formTitle').textContent = 'タスクを編集中';
+    document.getElementById('addBtn').textContent = '更新';
+    document.getElementById('addForm').classList.add('editing');
+    document.querySelector('.add-wrap').scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('taskInput').focus();
+    renderTasks();
+  }
+
+  function commitForm() {
+    const name = document.getElementById('taskInput').value.trim(); if (!name) return;
+    const priority = document.getElementById('prioritySelect').value;
+    const category = document.getElementById('categorySelect').value;
+    const due      = getDueValue();
+    if (editingId) {
+      const t = tasks.find(t => t.id === editingId);
+      if (t) Object.assign(t, { name, priority, category, due });
+    } else {
+      tasks.unshift({ id: Date.now(), name, priority, category, due, done: false, added: Date.now() });
+    }
+    save(); resetForm(); renderCatTabs(); updateDeadlineSummary(); renderTasks();
+  }
+
+  // 完了確認ダイアログ
+  let pendingDoneId = null;
+
+  function openConfirm(id) {
+    const t = tasks.find(t => t.id === id); if (!t) return;
+    pendingDoneId = id;
+    document.getElementById('confirmTaskName').textContent = t.name;
+    document.getElementById('confirmDialog').classList.add('open');
+    document.getElementById('confirmOverlay').classList.add('open');
+  }
+  function closeConfirm() {
+    pendingDoneId = null;
+    document.getElementById('confirmDialog').classList.remove('open');
+    document.getElementById('confirmOverlay').classList.remove('open');
+  }
+  document.getElementById('confirmCancel').addEventListener('click', closeConfirm);
+  document.getElementById('confirmOverlay').addEventListener('click', closeConfirm);
+  document.getElementById('confirmYes').addEventListener('click', () => {
+    if (pendingDoneId === null) return;
+    const t = tasks.find(t => t.id === pendingDoneId);
+    if (t) { t.done = true; save(); updateDeadlineSummary(); renderTasks(); }
+    closeConfirm();
+  });
+
+  function toggleDone(id) {
+    const t = tasks.find(t => t.id === id); if (!t) return;
+    if (!t.done) {
+      // 未完了 → 完了：確認ダイアログを出す
+      openConfirm(id);
+    } else {
+      // 完了 → 未完了：確認なしで即戻す
+      t.done = false; save(); updateDeadlineSummary(); renderTasks();
+    }
+  }
+  function deleteTask(id) {
+    if (editingId === id) resetForm();
+    tasks = tasks.filter(t => t.id !== id);
+    save(); renderCatTabs(); updateDeadlineSummary(); renderTasks();
+  }
+
+  function getFiltered() {
+    let r = tasks;
+    if (searchQuery) r = r.filter(t => t.name.includes(searchQuery));
+    if (zoneFilter) {
+      r = r.filter(t => !t.done && getZone(t) === zoneFilter);
+    } else {
+      if (filter === 'undone')       r = r.filter(t => !t.done);
+      else if (filter === 'done')    r = r.filter(t => t.done);
+      else if (filter === 'overdue') r = r.filter(t => !t.done && isOverdue(t.due));
+      else if (filter === 'today')   r = r.filter(t => isToday(t.due));
+    }
+    if (catFilter !== 'all') r = r.filter(t => t.category === catFilter);
+    if (sortMode === 'priority') r = [...r].sort((a,b) => PRI_ORDER[a.priority]-PRI_ORDER[b.priority]);
+    else if (sortMode === 'due') r = [...r].sort((a,b) => { if (!a.due&&!b.due) return 0; if (!a.due) return 1; if (!b.due) return -1; return new Date(a.due)-new Date(b.due); });
+    return r;
+  }
+
+  function renderCatTabs() {
+    const cats = [...new Set(tasks.map(t => t.category).filter(Boolean))];
+    const el = document.getElementById('catTabs');
+    el.innerHTML = '';
+    ['all', ...cats].forEach(cat => {
+      const btn = document.createElement('button');
+      btn.className = 'cat-tab' + (catFilter === cat ? ' active' : '');
+      btn.dataset.cat = cat;
+      btn.textContent = cat === 'all' ? 'すべて' : cat;
+      btn.addEventListener('click', () => { catFilter = cat; renderCatTabs(); renderTasks(); });
+      el.appendChild(btn);
+    });
+  }
+
+  function renderTasks() {
+    const list = getFiltered();
+    document.getElementById('undoneCount').textContent = tasks.filter(t => !t.done).length;
+    document.getElementById('doneCount').textContent   = tasks.filter(t => t.done).length;
+    const zoneLabels = { over:'期限切れ', today:'本日', '2d':'2日以内', '7d':'3〜7日', '30d':'8〜30日', '90d':'31〜90日', '1y':'91日〜1年', none:'期限なし' };
+    document.getElementById('summaryText').textContent = zoneFilter ? `【${zoneLabels[zoneFilter]}】${list.length}件` : list.length+'件表示';
+
+    const el = document.getElementById('taskList');
+    if (!list.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">✓</div>タスクがありません</div>'; return; }
+
+    el.innerHTML = '';
+    list.forEach(task => {
+      const card = document.createElement('div');
+      card.className = ['task-card', PRI_CLASS[task.priority], task.done?'done':'', editingId===task.id?'editing-now':''].filter(Boolean).join(' ');
+      let dueHtml = '';
+      if (task.due) {
+        let cls = 'meta-chip chip-due', label = '期限';
+        if (!task.done && isOverdue(task.due)) { cls += ' overdue'; label = '⚠ 期限'; }
+        else if (isToday(task.due))            { cls += ' today';   label = '🔔 期限'; }
+        dueHtml = `<span class="${cls}"><span class="chip-label">${label} </span>${fmtDate(task.due)}</span>`;
+      }
+      card.innerHTML = `
+        <button class="check-btn"><span class="check-icon">✓</span></button>
+        <div class="task-body">
+          <div class="task-name">${esc(task.name)}</div>
+          <div class="task-meta">
+            <span class="meta-chip chip-pri ${PRI_CLASS[task.priority]}"><span class="chip-label">優先度 </span>${PRI_LABEL[task.priority]}</span>
+            ${task.category?`<span class="meta-chip chip-cat"><span class="chip-label">カテゴリ </span>${esc(task.category)}</span>`:''}
+            ${dueHtml}
+          </div>
+        </div>
+        <div class="card-actions">
+          <button class="icon-btn" title="編集">✏️</button>
+          <button class="icon-btn" title="削除">🗑</button>
+        </div>`;
+      card.querySelector('.check-btn').addEventListener('click', () => toggleDone(task.id));
+      card.querySelectorAll('.icon-btn')[0].addEventListener('click', () => startEdit(task.id));
+      card.querySelectorAll('.icon-btn')[1].addEventListener('click', () => deleteTask(task.id));
+      el.appendChild(card);
+    });
+  }
+
+  document.getElementById('addBtn').addEventListener('click', commitForm);
+  document.getElementById('resetBtn').addEventListener('click', resetForm);
+  document.getElementById('taskInput').addEventListener('keydown', e => { if (e.key==='Enter') commitForm(); });
+
+  document.querySelectorAll('.filter-btn').forEach(btn => btn.addEventListener('click', () => {
+    filter = btn.dataset.filter; zoneFilter = null;
+    updateDeadlineSummary();
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active'); renderTasks();
+  }));
+  document.querySelectorAll('.sort-btn').forEach(btn => btn.addEventListener('click', () => {
+    sortMode = btn.dataset.sort;
+    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active'); renderTasks();
+  }));
+  document.getElementById('searchInput').addEventListener('input', e => { searchQuery = e.target.value.trim(); renderTasks(); });
+  document.getElementById('clearDoneBtn').addEventListener('click', () => {
+    tasks = tasks.filter(t => !t.done); save(); renderCatTabs(); updateDeadlineSummary(); renderTasks();
+  });
+
+  renderCatTabs(); updateDeadlineSummary(); renderTasks();
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
